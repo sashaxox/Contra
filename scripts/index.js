@@ -1,0 +1,14 @@
+import * as PIXI from "../pixi/pixi.mjs";
+import Game from "./Game.js";
+const app = new PIXI.Application();
+
+async function init() {
+  await app.init({ background: "0x000000", width: 1024, height: 768 });
+  const game = new Game(app);
+  app.ticker.add(()=>{
+    game.update()
+  });
+  document.body.appendChild(app.canvas);
+}
+
+init();

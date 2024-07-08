@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "pixi.js": "^8.2.2",
+    "serve": "^14.2.3"
+  }
+}
