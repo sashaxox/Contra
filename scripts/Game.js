@@ -1,10 +1,14 @@
 import Hero from "./Entities/Hero.js";
-import Platform from "./Entities/Platform.js";
+import KeyboardProcessor from "./Entities/KeyboardProcessor.js";
+import PlatformFactory from "./Entities/platforms/PlatformFactory.js";
+// import Platform from "./Entities/Platform.js";
 
 export default class Game {
   #pixiApp;
   #hero;
   #platforms = [];
+
+  keyboardProcessor;
   constructor(pixiApp) {
     this.#pixiApp = pixiApp;
 
@@ -13,40 +17,65 @@ export default class Game {
     this.#hero.y = 100;
     this.#pixiApp.stage.addChild(this.#hero);
 
-    const platform1 = new Platform();
-    platform1.x = 50;
-    platform1.y = 400;
-    this.#pixiApp.stage.addChild(platform1);
+    const platformFactory = new PlatformFactory(this.#pixiApp);
 
-    const platform2 = new Platform();
-    platform2.x = 200;
-    platform2.y = 450;
-    this.#pixiApp.stage.addChild(platform2);
-
-    const platform3 = new Platform();
-    platform3.x = 400;
-    platform3.y = 400;
-    this.#pixiApp.stage.addChild(platform3);
-
-    this.#platforms.push(platform1, platform2, platform3);
+    this.#platforms.push(
+      platformFactory.createPlatform(50, 400),
+      platformFactory.createPlatform(200, 450),
+      platformFactory.createPlatform(400, 400)
+    );
+    this.keyboardProcessor = new KeyboardProcessor(this);
+    this.keyboardProcessor.getButton("KeyS").executeDown = function () {
+      this.#hero.jump();
+    };
+    this.keyboardProcessor.getButton("ArrowLeft").executeDown = function () {
+      this.#hero.startLeftMove();
+    };
+    this.keyboardProcessor.getButton("ArrowLeft").executeUp = function () {
+      this.#hero.stopLeftMove();
+    };
+    this.keyboardProcessor.getButton("ArrowRight").executeDown = function () {
+      this.#hero.startRightMove();
+    };
+    this.keyboardProcessor.getButton("ArrowRight").executeUp = function () {
+      this.#hero.stopRightMove();
+    };
   }
   update() {
     const prevPoint = { y: this.#hero.y, x: this.#hero.x };
     this.#hero.update();
     for (let i = 0; i < this.#platforms.length; i++) {
-      if (!this.isCheckAABB(this.#hero, this.#platforms[i])) {
-        continue;
-      }
-      const currY = this.#hero.y;
-      this.#hero.y = prevPoint.y;
-      if (!this.isCheckAABB(this.#hero, this.#platforms[i])) {
+      const collisionResult = this.getPlatformCollisionResult(
+        this.#hero,
+        this.#platforms[i],
+        prevPoint
+      );
+      if (collisionResult.vertical == true) {
         this.#hero.stay();
-        continue;
       }
-      this.#hero.y = currY;
-      this.#hero.x = prevPoint.x;
     }
   }
+
+  getPlatformCollisionResult(character, platform, prevPoint) {
+    const collisionResult = {
+      horizontal: false,
+      vertical: false,
+    };
+    if (!this.isCheckAABB(character, platform)) {
+      return collisionResult;
+    }
+    const currY = character.y;
+    character.y = prevPoint.y;
+    if (!this.isCheckAABB(character, platform)) {
+      collisionResult.vertical = true;
+      return collisionResult;
+    }
+    character.y = currY;
+    character.x = prevPoint.x;
+    collisionResult.horizontal = true;
+    return collisionResult;
+  }
+
   isCheckAABB(entity, area) {
     return (
       entity.x < area.x + area.width &&
