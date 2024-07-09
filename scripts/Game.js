@@ -18,8 +18,8 @@ export default class Game {
 
     const platformFactory = new PlatformFactory(this.#pixiApp);
 
-    const box = platformFactory.createBox(400, 708)
-    box.isStep = true
+    const box = platformFactory.createBox(400, 708);
+    box.isStep = true;
     this.#platforms.push(
       platformFactory.createPlatform(100, 400),
       platformFactory.createPlatform(300, 400),
@@ -38,7 +38,7 @@ export default class Game {
     const prevPoint = { y: this.#hero.y, x: this.#hero.x };
     this.#hero.update();
     for (let i = 0; i < this.#platforms.length; i++) {
-      if (this.#hero.isJumpState() && this.#platforms[i].type != 'box') {
+      if (this.#hero.isJumpState() && this.#platforms[i].type != "box") {
         continue;
       }
       const collisionResult = this.getPlatformCollisionResult(
@@ -61,11 +61,11 @@ export default class Game {
     if (collisionResult.vertical == true) {
       character.y = prevPoint.y;
     }
-    if (collisionResult.horizontal == true && platform.type == 'box') {
+    if (collisionResult.horizontal == true && platform.type == "box") {
       if (platform.isStep) {
-        character.stay(platform.y)
+        character.stay(platform.y);
       }
-      character.x = prevPoint.x
+      character.x = prevPoint.x;
     }
 
     return collisionResult;
