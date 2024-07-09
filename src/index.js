@@ -1,4 +1,4 @@
-import * as PIXI from "../pixi/pixi.mjs";
+import * as PIXI from "../lib/pixi.mjs";
 import Game from "./Game.js";
 const app = new PIXI.Application();
 

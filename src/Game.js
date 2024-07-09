@@ -1,4 +1,4 @@
-import Hero from "./Entities/Hero.js";
+import Hero from "./Entities/Hero/Hero.js";
 import KeyboardProcessor from "./Entities/KeyboardProcessor.js";
 import PlatformFactory from "./Entities/platforms/PlatformFactory.js";
 
@@ -11,10 +11,10 @@ export default class Game {
   constructor(pixiApp) {
     this.#pixiApp = pixiApp;
 
-    this.#hero = new Hero();
+    this.#hero = new Hero(this.#pixiApp.stage);
     this.#hero.x = 200;
     this.#hero.y = 100;
-    this.#pixiApp.stage.addChild(this.#hero);
+    // this.#pixiApp.stage.addChild(this.#hero);
 
     const platformFactory = new PlatformFactory(this.#pixiApp);
 
@@ -54,7 +54,7 @@ export default class Game {
 
   getPlatformCollisionResult(character, platform, prevPoint) {
     const collisionResult = this.getOrientCollisionResult(
-      character.getRect(),
+      character.collisionBox,
       platform,
       prevPoint
     );

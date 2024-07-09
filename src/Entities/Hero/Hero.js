@@ -1,4 +1,4 @@
-import { Container, Graphics } from "../../pixi/pixi.mjs";
+import HeroView from "./HeroView.js";
 
 const States = {
   Stay: "stay",
@@ -6,7 +6,7 @@ const States = {
   FlyDown: "flydown",
 };
 
-export default class Hero extends Container {
+export default class Hero {
   #GRAVITY_FORCE = 0.2;
   #SPEED = 3;
   #velocityX = 0;
@@ -21,13 +21,34 @@ export default class Hero extends Container {
     left: 0,
     right: 0,
   };
+
   #state = States.Stay;
-  constructor() {
-    super();
-    const view = new Graphics();
-    view.rect(0, 0, 20, 90).stroke(0xffff00);
-    this.addChild(view);
+
+  #view;
+
+  constructor(stage) {
+    this.#view = new HeroView();
+    stage.addChild(this.#view);
   }
+
+  get x() {
+    return this.#view.x;
+  }
+  set x(value) {
+    this.#view.x = value;
+  }
+
+  get y() {
+    return this.#view.y;
+  }
+  set y(value) {
+    this.#view.y = value;
+  }
+
+  get collisionBox() {
+    return this.#view.collisionBox
+  }
+
   update() {
     this.#velocityX = this.#movement.x * this.#SPEED;
     this.x += this.#velocityX;
@@ -43,7 +64,7 @@ export default class Hero extends Container {
     this.#state = States.Stay;
     this.#velocityY = 0;
 
-    this.y = platformY - this.height
+    this.y = platformY - this.#view.collisionBox.height;
   }
   jump() {
     if (this.#state == States.Jump || this.#state == States.FlyDown) {
@@ -84,20 +105,7 @@ export default class Hero extends Container {
     this.#movement.x = this.#directionContext.left;
   }
 
-  #rect = {
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-  };
-  getRect() {
-    this.#rect.x = this.x;
-    this.#rect.y = this.y;
-    this.#rect.width = this.width;
-    this.#rect.height = this.height;
-    return this.#rect;
-  }
-  throwDown(){
-    this.#state = States.Jump
+  throwDown() {
+    this.#state = States.Jump;
   }
 }
