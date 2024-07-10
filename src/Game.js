@@ -1,6 +1,7 @@
 import { Container } from "../lib/pixi.mjs";
 import Camera from "./Camera.js";
 import BulletFactory from "./Entities/Bullets/BulletFactory.js";
+import RunnerFactory from "./Entities/Enemies/Runner/RunnerFactory.js";
 import Hero from "./Entities/Hero/Hero.js";
 import KeyboardProcessor from "./Entities/KeyboardProcessor.js";
 import PlatformFactory from "./Entities/platforms/PlatformFactory.js";
@@ -11,8 +12,10 @@ export default class Game {
   #platforms = [];
   #camera;
   #bullets = [];
+  #enemies = [];
   #bulletFactory;
   #worldContainer;
+  #runnerFactory;
 
   keyboardProcessor;
   constructor(pixiApp) {
@@ -21,7 +24,7 @@ export default class Game {
     this.#worldContainer = new Container();
     this.#pixiApp.stage.addChild(this.#worldContainer);
     this.#hero = new Hero(this.#worldContainer);
-    this.#hero.x = 200;
+    this.#hero.x = 100;
     this.#hero.y = 100;
 
     const platformFactory = new PlatformFactory(this.#worldContainer);
@@ -29,7 +32,7 @@ export default class Game {
     box.isStep = true;
     this.#platforms.push(
       platformFactory.createPlatform(100, 400),
-      platformFactory.createPlatform(300, 400),
+      // platformFactory.createPlatform(300, 400),
       platformFactory.createPlatform(500, 400),
       platformFactory.createPlatform(700, 400),
       platformFactory.createPlatform(900, 400),
@@ -59,21 +62,36 @@ export default class Game {
     this.setKeys();
 
     this.#bulletFactory = new BulletFactory();
+    this.#runnerFactory = new RunnerFactory(this.#worldContainer);
+    this.#enemies.push(this.#runnerFactory.create(800, 150));
+    this.#enemies.push(this.#runnerFactory.create(900, 150));
+    this.#enemies.push(this.#runnerFactory.create(1200, 150));
+    this.#enemies.push(this.#runnerFactory.create(1600, 150));
   }
   update() {
-    const prevPoint = { y: this.#hero.y, x: this.#hero.x };
     this.#hero.update();
-    for (let i = 0; i < this.#platforms.length; i++) {
-      if (this.#hero.isJumpState() && this.#platforms[i].type != "box") {
+    for (let i = 0; i < this.#enemies.length; i++) {
+      this.#enemies[i].update();
+      let isDead = false;
+      for (let bullet of this.#bullets) {
+        if (this.isCheckAABB(bullet, this.#enemies[i].collisionBox)) {
+          isDead = true;
+          bullet.isDead = true;
+          break;
+        }
+      }
+      this.#checkEnemy(this.#enemies[i], i, isDead);
+    }
+    for (let platform of this.#platforms) {
+      if (this.#hero.isJumpState() && platform.type != "box") {
         continue;
       }
-      const collisionResult = this.getPlatformCollisionResult(
-        this.#hero,
-        this.#platforms[i],
-        prevPoint
-      );
-      if (collisionResult.vertical == true) {
-        this.#hero.stay(this.#platforms[i].y);
+      this.checkPlatformCollision(this.#hero, platform);
+      for (let enemy of this.#enemies) {
+        if (enemy.isJumpState() && platform.type != "box") {
+          continue;
+        }
+        this.checkPlatformCollision(enemy, platform);
       }
     }
     this.#camera.update();
@@ -84,7 +102,8 @@ export default class Game {
     }
   }
 
-  getPlatformCollisionResult(character, platform, prevPoint) {
+  checkPlatformCollision(character, platform) {
+    const prevPoint = character.prevPoint;
     const collisionResult = this.getOrientCollisionResult(
       character.collisionBox,
       platform,
@@ -92,15 +111,15 @@ export default class Game {
     );
     if (collisionResult.vertical == true) {
       character.y = prevPoint.y;
+      character.stay(platform.y);
     }
     if (collisionResult.horizontal == true && platform.type == "box") {
       if (platform.isStep) {
         character.stay(platform.y);
+      } else {
+        character.x = prevPoint.x;
       }
-      character.x = prevPoint.x;
     }
-
-    return collisionResult;
   }
   getOrientCollisionResult(aaRect, bbRect, aaPrevPoint) {
     const collisionResult = {
@@ -193,6 +212,7 @@ export default class Game {
   }
   #checkBulletPosition(bullet, index) {
     if (
+      bullet.isDead ||
       bullet.x > this.#pixiApp.screen.width - this.#worldContainer.x ||
       bullet.x < -this.#worldContainer.x ||
       bullet.y > this.#pixiApp.screen.height ||
@@ -202,6 +222,19 @@ export default class Game {
         bullet.removeFromParent();
       }
       this.#bullets.splice(index, 1);
+    }
+  }
+
+  #checkEnemy(enemy, index, isDead) {
+    if (
+      isDead ||
+      enemy.x > this.#pixiApp.screen.width - this.#worldContainer.x ||
+      enemy.x < -this.#worldContainer.x ||
+      enemy.y > this.#pixiApp.screen.height ||
+      enemy.y < 0
+    ) {
+      enemy.removeFromParent();
+      this.#enemies.splice(index, 1);
     }
   }
 }
