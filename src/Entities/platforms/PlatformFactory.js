@@ -2,15 +2,15 @@ import Box from "./Box.js";
 import Platform from "./Platform.js";
 
 export default class PlatformFactory {
-  #pixiApp;
-  constructor(pixiApp) {
-    this.#pixiApp = pixiApp;
+  #worldContainer;
+  constructor(worldContainer) {
+    this.#worldContainer = worldContainer;
   }
   createPlatform(x, y) {
     const platform = new Platform();
     platform.x = x;
     platform.y = y;
-    this.#pixiApp.stage.addChild(platform);
+    this.#worldContainer.addChild(platform);
 
     return platform;
   }
@@ -18,7 +18,7 @@ export default class PlatformFactory {
     const box = new Box();
     box.x = x;
     box.y = y;
-    this.#pixiApp.stage.addChild(box);
+    this.#worldContainer.addChild(box);
 
     return box;
   }
