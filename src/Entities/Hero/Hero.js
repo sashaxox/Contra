@@ -25,10 +25,14 @@ export default class Hero {
   #state = States.Stay;
 
   #view;
+  #isLay = false;
+  #isStaUp = false;
 
   constructor(stage) {
     this.#view = new HeroView();
     stage.addChild(this.#view);
+    this.#state = States.Jump
+    this.#view.showJump();
   }
 
   get x() {
@@ -46,13 +50,17 @@ export default class Hero {
   }
 
   get collisionBox() {
-    return this.#view.collisionBox
+    return this.#view.collisionBox;
   }
 
   update() {
     this.#velocityX = this.#movement.x * this.#SPEED;
     this.x += this.#velocityX;
-    if (this.#velocityY > 0 && this.isJumpState) {
+
+    if (this.#velocityY > 0) {
+      if(!(this.#state == States.Jump || this.#state == States.FlyDown)){
+        this.#view.showFall()
+      }
       this.#state = States.FlyDown;
     }
 
@@ -61,6 +69,16 @@ export default class Hero {
   }
 
   stay(platformY) {
+    if (this.#state == States.Jump || this.#state == States.FlyDown) {
+      const fakeButtonContext = {};
+      fakeButtonContext.arrowLeft = this.#movement.x == -1;
+      fakeButtonContext.arrowRight = this.#movement.x == 1;
+      fakeButtonContext.arrowDown = this.#isLay;
+      fakeButtonContext.arrowUp = this.#isStaUp;
+      this.#state = States.Stay;
+
+      this.setView(fakeButtonContext);
+    }
     this.#state = States.Stay;
     this.#velocityY = 0;
 
@@ -73,6 +91,7 @@ export default class Hero {
     this.#state = States.Jump;
 
     this.#velocityY -= this.#JUMP_FORCE;
+    this.#view.showJump();
   }
 
   isJumpState() {
@@ -107,5 +126,33 @@ export default class Hero {
 
   throwDown() {
     this.#state = States.Jump;
+    this.#view.showFall();
+  }
+  setView(buttonContext) {
+    if (this.#state == States.Jump || this.#state == States.FlyDown) {
+      return;
+    }
+
+    this.#view.flip(this.#movement.x);
+
+    this.#isLay = buttonContext.arrowDown;
+    this.#isStaUp = buttonContext.arrowUp;
+    if (buttonContext.arrowLeft || buttonContext.arrowRight) {
+      if (buttonContext.arrowUp) {
+        this.#view.showRunUp();
+      } else if (buttonContext.arrowDown) {
+        this.#view.showRunDown();
+      } else {
+        this.#view.showRun();
+      }
+    } else {
+      if (buttonContext.arrowUp) {
+        this.#view.showStayUp();
+      } else if (buttonContext.arrowDown) {
+        this.#view.showLay();
+      } else {
+        this.#view.showStay();
+      }
+    }
   }
 }
