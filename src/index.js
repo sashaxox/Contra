@@ -13,13 +13,13 @@ async function init() {
 
   document.body.appendChild(app.canvas);
 
-  document.addEventListener("keydown", function (key) {
-    game.keyboardProcessor.onKeyDown(key);
-  });
+  document.addEventListener("keydown", (key) =>
+    game.keyboardProcessor.onKeyDown(key)
+  );
 
-  document.addEventListener("keyup", function (key) {
-    game.keyboardProcessor.onKeyUp(key);
-  });
+  document.addEventListener("keyup", (key) =>
+    game.keyboardProcessor.onKeyUp(key)
+  );
 }
 
 init();
