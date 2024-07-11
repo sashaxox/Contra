@@ -21,7 +21,7 @@ export default class HeroWeaponUnit {
     this.#bulletContext.angle = this.#heroView.isFliped
       ? this.#bulletAngle * -1 + 180
       : this.#bulletAngle;
- 
+
     return this.#bulletContext;
   }
 

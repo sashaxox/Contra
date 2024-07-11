@@ -11,6 +11,14 @@ export default class HeroView extends Container {
     width: 0,
     height: 0,
   };
+  #hitBox = {
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    shiftX: 0,
+    shiftY: 0,
+  };
 
   #stm = {
     currentState: "default",
@@ -54,6 +62,11 @@ export default class HeroView extends Container {
     this.#collisionBox.x = this.x;
     this.#collisionBox.y = this.y;
     return this.#collisionBox;
+  }
+  get hitBox() {
+    this.#hitBox.x = this.x + this.#hitBox.shiftX;
+    this.#hitBox.y = this.y + this.#hitBox.shiftY;
+    return this.#hitBox;
   }
 
   get isFliped() {

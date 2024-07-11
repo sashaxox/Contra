@@ -2,30 +2,48 @@ import { Container } from "../lib/pixi.mjs";
 import Camera from "./Camera.js";
 import BulletFactory from "./Entities/Bullets/BulletFactory.js";
 import RunnerFactory from "./Entities/Enemies/Runner/RunnerFactory.js";
-import Hero from "./Entities/Hero/Hero.js";
-import KeyboardProcessor from "./Entities/KeyboardProcessor.js";
+import KeyboardProcessor from "./KeyboardProcessor.js";
 import PlatformFactory from "./Entities/platforms/PlatformFactory.js";
+import HeroFactory from "./Entities/Hero/HeroFactory.js";
+import Physics from "./Physics.js";
+import TourelleFactory from "./Entities/Enemies/Tourelle/TourelleFactory.js";
+import Weapon from "./Weapon.js";
 
 export default class Game {
   #pixiApp;
   #hero;
   #platforms = [];
+  #entities = [];
   #camera;
-  #bullets = [];
-  #enemies = [];
   #bulletFactory;
   #worldContainer;
   #runnerFactory;
+  #weapon;
 
   keyboardProcessor;
+
   constructor(pixiApp) {
     this.#pixiApp = pixiApp;
 
     this.#worldContainer = new Container();
     this.#pixiApp.stage.addChild(this.#worldContainer);
-    this.#hero = new Hero(this.#worldContainer);
-    this.#hero.x = 100;
-    this.#hero.y = 100;
+
+    this.#bulletFactory = new BulletFactory(
+      this.#worldContainer, //.game
+      this.#entities
+    );
+
+    const heroFactory = new HeroFactory(this.#worldContainer);
+    this.#hero = heroFactory.create(100, 100);
+    this.#entities.push(this.#hero);
+
+    // const runnerFactory = new RunnerFactory(
+    //   this.#worldContainer, //.game
+    //   this.#hero,
+    //   this.#bulletFactory,
+    //   this.#entities,
+    //   assets
+    // );
 
     const platformFactory = new PlatformFactory(this.#worldContainer);
     const box = platformFactory.createBox(400, 708);
@@ -57,54 +75,108 @@ export default class Game {
     };
 
     this.#camera = new Camera(cameraSettings);
+    this.#weapon = new Weapon(this.#bulletFactory);
+    this.#weapon.setWeapon(1);
 
     this.keyboardProcessor = new KeyboardProcessor(this);
     this.setKeys();
 
-    this.#bulletFactory = new BulletFactory();
+    this.#bulletFactory = new BulletFactory(this.#worldContainer);
     this.#runnerFactory = new RunnerFactory(this.#worldContainer);
-    this.#enemies.push(this.#runnerFactory.create(800, 150));
-    this.#enemies.push(this.#runnerFactory.create(900, 150));
-    this.#enemies.push(this.#runnerFactory.create(1200, 150));
-    this.#enemies.push(this.#runnerFactory.create(1600, 150));
+    this.#entities.push(this.#runnerFactory.create(800, 150));
+    this.#entities.push(this.#runnerFactory.create(900, 150));
+    this.#entities.push(this.#runnerFactory.create(1200, 150));
+    this.#entities.push(this.#runnerFactory.create(1600, 150));
+    const tourelleFactory = new TourelleFactory(
+      this.#worldContainer,
+      this.#hero,
+      this.#bulletFactory
+    );
+    this.#entities.push(tourelleFactory.create(500, 200));
   }
+
   update() {
-    this.#hero.update();
-    for (let i = 0; i < this.#enemies.length; i++) {
-      this.#enemies[i].update();
-      let isDead = false;
-      for (let bullet of this.#bullets) {
-        if (this.isCheckAABB(bullet, this.#enemies[i].collisionBox)) {
-          isDead = true;
-          bullet.isDead = true;
-          break;
-        }
+    for (let i = 0; i < this.#entities.length; i++) {
+      const entity = this.#entities[i];
+      entity.update();
+
+      if (entity.type == "hero" || entity.type == "enemy") {
+        //|| entity.type == "powerupBox" || entity.type == "spreadgunPowerup"
+        this.#checkDamage(entity);
+        this.#checkPlatforms(entity);
       }
-      this.#checkEnemy(this.#enemies[i], i, isDead);
+
+      this.#checkEntityStatus(entity, i);
     }
+
+    this.#camera.update();
+    // this.#weapon.update(this.#hero.bulletContext);
+
+    // this.#checkGameStatus();
+  }
+  #checkDamage(entity) {
+    const damagers = this.#entities.filter(
+      (damager) =>
+        (entity.type == "enemy" && //|| entity.type == "powerupBox")
+          damager.type == "heroBullet") || //
+        (entity.type == "hero" &&
+          (damager.type == "enemyBullet" || damager.type == "enemy"))
+    );
+
+    for (let damager of damagers) {
+      if (Physics.isCheckAABB(damager.hitBox, entity.hitBox)) {
+        entity.damage();
+        if (damager.type != "enemy") {
+          damager.dead();
+        }
+
+        break;
+      }
+    }
+  }
+  #checkPlatforms(character) {
+    if (character.isDead || !character.gravitable) {
+      return;
+    }
+
     for (let platform of this.#platforms) {
-      if (this.#hero.isJumpState() && platform.type != "box") {
+      if (
+        (character.isJumpState() && platform.type != "box") ||
+        !platform.isActive
+      ) {
         continue;
       }
-      this.checkPlatformCollision(this.#hero, platform);
-      for (let enemy of this.#enemies) {
-        if (enemy.isJumpState() && platform.type != "box") {
-          continue;
-        }
-        this.checkPlatformCollision(enemy, platform);
-      }
+      this.checkPlatformCollision(character, platform);
     }
-    this.#camera.update();
 
-    for (let i = 0; i < this.#bullets.length; i++) {
-      this.#bullets[i].update();
-      this.#checkBulletPosition(this.#bullets[i], i);
+    if (character.type == "hero" && character.x < -this.#worldContainer.x) {
+      character.x = character.prevPoint.x;
     }
   }
-
+  #checkEntityStatus(entity, index) {
+    if (entity.isDead || this.#isScreenOut(entity)) {
+      entity.removeFromStage();
+      this.#entities.splice(index, 1);
+    }
+  }
+  #isScreenOut(entity) {
+    if (entity.type == "heroBullet" || entity.type == "enemyBullet") {
+      return (
+        entity.x > this.#pixiApp.screen.width - this.#worldContainer.x ||
+        entity.x < -this.#worldContainer.x ||
+        entity.y > this.#pixiApp.screen.height ||
+        entity.y < 0
+      );
+    } else if (entity.type == "enemy" || entity.type == "hero") {
+      return (
+        entity.x < -this.#worldContainer.x ||
+        entity.y > this.#pixiApp.screen.height
+      );
+    }
+  }
   checkPlatformCollision(character, platform) {
     const prevPoint = character.prevPoint;
-    const collisionResult = this.getOrientCollisionResult(
+    const collisionResult = Physics.getOrientCollisionResult(
       character.collisionBox,
       platform,
       prevPoint
@@ -121,38 +193,27 @@ export default class Game {
       }
     }
   }
-  getOrientCollisionResult(aaRect, bbRect, aaPrevPoint) {
-    const collisionResult = {
-      horizontal: false,
-      vertical: false,
-    };
-    if (!this.isCheckAABB(aaRect, bbRect)) {
-      return collisionResult;
-    }
-    aaRect.y = aaPrevPoint.y;
-    if (!this.isCheckAABB(aaRect, bbRect)) {
-      collisionResult.vertical = true;
-      return collisionResult;
-    }
-    collisionResult.horizontal = true;
-    return collisionResult;
-  }
-
-  isCheckAABB(entity, area) {
-    return (
-      entity.x < area.x + area.width &&
-      entity.x + entity.width > area.x &&
-      entity.y < area.y + area.height &&
-      entity.y + entity.height > area.y
-    );
-  }
 
   setKeys() {
     this.keyboardProcessor.getButton("KeyA").executeDown = function () {
-      const bullet = this.#bulletFactory.createBullet(this.#hero.bulletContext);
-      this.#worldContainer.addChild(bullet);
-      this.#bullets.push(bullet);
+      if (!this.#hero.isDead && !this.#hero.isFall) {
+        const bullets = this.#entities.filter(
+          (bullet) => bullet.type == this.#hero.bulletContext.type
+        );
+        if (bullets.length > 10) {
+          return;
+        }
+        this.#weapon.startFire();
+        this.#hero.setView(this.getArrowButtonContext());
+      }
     };
+    this.keyboardProcessor.getButton("KeyA").executeUp = function () {
+      if (!this.#hero.isDead && !this.#hero.isFall) {
+        this.#weapon.stopFire();
+        this.#hero.setView(this.getArrowButtonContext());
+      }
+    };
+
     this.keyboardProcessor.getButton("KeyS").executeDown = function () {
       if (
         this.keyboardProcessor.isButtonPressed("ArrowDown") &&
@@ -166,10 +227,8 @@ export default class Game {
         this.#hero.jump();
       }
     };
+
     const arrowLeft = this.keyboardProcessor.getButton("ArrowLeft");
-    const arrowRight = this.keyboardProcessor.getButton("ArrowRight");
-    const arrowUp = this.keyboardProcessor.getButton("ArrowUp");
-    const arrowDown = this.keyboardProcessor.getButton("ArrowDown");
     arrowLeft.executeDown = function () {
       this.#hero.startLeftMove();
       this.#hero.setView(this.getArrowButtonContext());
@@ -178,6 +237,8 @@ export default class Game {
       this.#hero.stopLeftMove();
       this.#hero.setView(this.getArrowButtonContext());
     };
+
+    const arrowRight = this.keyboardProcessor.getButton("ArrowRight");
     arrowRight.executeDown = function () {
       this.#hero.startRightMove();
       this.#hero.setView(this.getArrowButtonContext());
@@ -186,12 +247,16 @@ export default class Game {
       this.#hero.stopRightMove();
       this.#hero.setView(this.getArrowButtonContext());
     };
+
+    const arrowUp = this.keyboardProcessor.getButton("ArrowUp");
     arrowUp.executeDown = function () {
       this.#hero.setView(this.getArrowButtonContext());
     };
     arrowUp.executeUp = function () {
       this.#hero.setView(this.getArrowButtonContext());
     };
+
+    const arrowDown = this.keyboardProcessor.getButton("ArrowDown");
     arrowDown.executeDown = function () {
       this.#hero.setView(this.getArrowButtonContext());
     };
@@ -199,6 +264,7 @@ export default class Game {
       this.#hero.setView(this.getArrowButtonContext());
     };
   }
+
   getArrowButtonContext() {
     const buttonContext = {};
     buttonContext.arrowLeft =
@@ -208,33 +274,7 @@ export default class Game {
     buttonContext.arrowUp = this.keyboardProcessor.isButtonPressed("ArrowUp");
     buttonContext.arrowDown =
       this.keyboardProcessor.isButtonPressed("ArrowDown");
+    buttonContext.shoot = this.keyboardProcessor.isButtonPressed("KeyA");
     return buttonContext;
-  }
-  #checkBulletPosition(bullet, index) {
-    if (
-      bullet.isDead ||
-      bullet.x > this.#pixiApp.screen.width - this.#worldContainer.x ||
-      bullet.x < -this.#worldContainer.x ||
-      bullet.y > this.#pixiApp.screen.height ||
-      bullet.y < 0
-    ) {
-      if (bullet.parent != null) {
-        bullet.removeFromParent();
-      }
-      this.#bullets.splice(index, 1);
-    }
-  }
-
-  #checkEnemy(enemy, index, isDead) {
-    if (
-      isDead ||
-      enemy.x > this.#pixiApp.screen.width - this.#worldContainer.x ||
-      enemy.x < -this.#worldContainer.x ||
-      enemy.y > this.#pixiApp.screen.height ||
-      enemy.y < 0
-    ) {
-      enemy.removeFromParent();
-      this.#enemies.splice(index, 1);
-    }
   }
 }

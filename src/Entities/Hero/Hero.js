@@ -1,4 +1,4 @@
-import HeroView from "./HeroView.js";
+import Entity from "../Entity.js";
 import HeroWeaponUnit from "./HeroWeaponUnit.js";
 
 const States = {
@@ -7,12 +7,13 @@ const States = {
   FlyDown: "flydown",
 };
 
-export default class Hero {
+export default class Hero extends Entity {
   #GRAVITY_FORCE = 0.2;
   #SPEED = 3;
+  #JUMP_FORCE = 9;
   #velocityX = 0;
   #velocityY = 0;
-  #JUMP_FORCE = 9;
+
   #movement = {
     x: 0,
     y: 0,
@@ -23,42 +24,33 @@ export default class Hero {
     right: 0,
   };
 
-  #state = States.Stay;
-
-  #view;
-  #isLay = false;
-  #isStaUp = false;
-
   #prevPoint = {
     x: 0,
     y: 0,
   };
+
+  #state = States.Stay;
+
+  #isLay = false;
+  #isStayUp = false;
+
   #heroWeaponUnit;
-  constructor(stage) {
-    this.#view = new HeroView();
-    stage.addChild(this.#view);
-    this.#heroWeaponUnit = new HeroWeaponUnit(this.#view);
+
+  type = "hero";
+  isFall = false;
+
+  constructor(view) {
+    super(view);
+
+    this.#heroWeaponUnit = new HeroWeaponUnit(this._view);
+
     this.#state = States.Jump;
-    this.#view.showJump();
+    this._view.showJump();
+
+    this.gravitable = true;
+    this.isActive = true;
   }
 
-  get x() {
-    return this.#view.x;
-  }
-  set x(value) {
-    this.#view.x = value;
-  }
-
-  get y() {
-    return this.#view.y;
-  }
-  set y(value) {
-    this.#view.y = value;
-  }
-
-  get collisionBox() {
-    return this.#view.collisionBox;
-  }
   get bulletContext() {
     return this.#heroWeaponUnit.bulletContext;
   }
@@ -66,6 +58,7 @@ export default class Hero {
   get prevPoint() {
     return this.#prevPoint;
   }
+
   update() {
     this.#prevPoint.x = this.x;
     this.#prevPoint.y = this.y;
@@ -75,7 +68,8 @@ export default class Hero {
 
     if (this.#velocityY > 0) {
       if (!(this.#state == States.Jump || this.#state == States.FlyDown)) {
-        this.#view.showFall();
+        this._view.showFall();
+        this.isFall = true;
       }
       this.#state = States.FlyDown;
     }
@@ -84,70 +78,92 @@ export default class Hero {
     this.y += this.#velocityY;
   }
 
+  damage() {
+    this.#movement.x = 0;
+    this.#GRAVITY_FORCE = 0;
+    this.#velocityX = 0;
+    this.#velocityY = 0;
+
+    const deadAnimation = this._view.showAndGetDeadAnimation();
+    deadAnimation.onComplete = () => {
+      this.dead();
+      deadAnimation.removeFromParent();
+    };
+  }
+
   stay(platformY) {
     if (this.#state == States.Jump || this.#state == States.FlyDown) {
       const fakeButtonContext = {};
       fakeButtonContext.arrowLeft = this.#movement.x == -1;
       fakeButtonContext.arrowRight = this.#movement.x == 1;
       fakeButtonContext.arrowDown = this.#isLay;
-      fakeButtonContext.arrowUp = this.#isStaUp;
+      fakeButtonContext.arrowUp = this.#isStayUp;
       this.#state = States.Stay;
-
       this.setView(fakeButtonContext);
+      this.isFall = false;
     }
+
     this.#state = States.Stay;
     this.#velocityY = 0;
 
-    this.y = platformY - this.#view.collisionBox.height;
+    this.y = platformY - this._view.collisionBox.height;
   }
+
   jump() {
     if (this.#state == States.Jump || this.#state == States.FlyDown) {
       return;
     }
     this.#state = States.Jump;
-
     this.#velocityY -= this.#JUMP_FORCE;
-    this.#view.showJump();
+    this._view.showJump();
   }
 
   isJumpState() {
     return this.#state == States.Jump;
   }
 
+  throwDown() {
+    this.#state = States.Jump;
+    this._view.showFall();
+    this.isFall = true;
+  }
+
   startLeftMove() {
     this.#directionContext.left = -1;
-    this.#movement.x = -1;
+
     if (this.#directionContext.right > 0) {
       this.#movement.x = 0;
       return;
     }
+
+    this.#movement.x = -1;
   }
+
   startRightMove() {
+    this.#directionContext.right = 1;
+
     if (this.#directionContext.left < 0) {
       this.#movement.x = 0;
       return;
     }
-    this.#directionContext.right = 1;
 
     this.#movement.x = 1;
   }
+
   stopLeftMove() {
     this.#directionContext.left = 0;
     this.#movement.x = this.#directionContext.right;
   }
+
   stopRightMove() {
     this.#directionContext.right = 0;
     this.#movement.x = this.#directionContext.left;
   }
 
-  throwDown() {
-    this.#state = States.Jump;
-    this.#view.showFall();
-  }
   setView(buttonContext) {
-    this.#view.flip(this.#movement.x);
+    this._view.flip(this.#movement.x);
     this.#isLay = buttonContext.arrowDown;
-    this.#isStaUp = buttonContext.arrowUp;
+    this.#isStayUp = buttonContext.arrowUp;
 
     this.#heroWeaponUnit.setBulletAngle(buttonContext, this.isJumpState());
 
@@ -157,20 +173,30 @@ export default class Hero {
 
     if (buttonContext.arrowLeft || buttonContext.arrowRight) {
       if (buttonContext.arrowUp) {
-        this.#view.showRunUp();
+        this._view.showRunUp();
       } else if (buttonContext.arrowDown) {
-        this.#view.showRunDown();
+        this._view.showRunDown();
       } else {
-        this.#view.showRun();
+        if (buttonContext.shoot) {
+          this._view.showRunShoot();
+        } else {
+          this._view.showRun();
+        }
       }
     } else {
       if (buttonContext.arrowUp) {
-        this.#view.showStayUp();
+        this._view.showStayUp();
       } else if (buttonContext.arrowDown) {
-        this.#view.showLay();
+        this._view.showLay();
       } else {
-        this.#view.showStay();
+        this._view.showStay();
       }
     }
+  }
+
+  reset() {
+    this.#GRAVITY_FORCE = 0.2;
+    this._view.reset();
+    this.resuraction();
   }
 }
